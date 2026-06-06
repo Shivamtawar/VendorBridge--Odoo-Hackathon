@@ -13,6 +13,20 @@ const createTables = async () => {
       updated_at TIMESTAMP DEFAULT NOW()
     )`,
 
+    `CREATE TABLE IF NOT EXISTS otp_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) NOT NULL,
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      purpose VARCHAR(50) NOT NULL CHECK (purpose IN ('register', 'change_password', 'reset_password')),
+      payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+      otp_hash VARCHAR(255) NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      expires_at TIMESTAMP NOT NULL,
+      verified_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`,
+
     `CREATE TABLE IF NOT EXISTS vendors (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID REFERENCES users(id) ON DELETE SET NULL,

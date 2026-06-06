@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
-const { getAllRFQs, getRFQById, createRFQ, updateRFQ, deleteRFQ, assignVendors, publishRFQ } = require('../controllers/rfqController');
+const { getAllRFQs, getRFQById, createRFQ, updateRFQ, deleteRFQ, assignVendors, publishRFQ, getRFQQRCode } = require('../controllers/rfqController');
 
 router.use(authenticate);
 
@@ -14,5 +14,6 @@ router.put('/:id', authorize('procurement_officer'), updateRFQ);
 router.delete('/:id', authorize('procurement_officer', 'admin'), deleteRFQ);
 router.post('/:id/assign-vendors', authorize('procurement_officer'), assignVendors);
 router.patch('/:id/publish', authorize('procurement_officer'), publishRFQ);
+router.get('/:id/qr', getRFQQRCode);
 
 module.exports = router;

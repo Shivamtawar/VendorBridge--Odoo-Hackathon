@@ -23,6 +23,8 @@ export const rfqAPI = {
   delete: (id) => api.delete(`/rfqs/${id}`),
   assignVendors: (id, vendor_ids) => api.post(`/rfqs/${id}/assign-vendors`, { vendor_ids }),
   publish: (id) => api.patch(`/rfqs/${id}/publish`),
+  qrUrl: (id) => `http://localhost:3000/api/rfqs/${id}/qr`,
+  qrSnapshot: (id) => api.get(`/rfqs/${id}/qr?format=json`),
 };
 
 // Quotations

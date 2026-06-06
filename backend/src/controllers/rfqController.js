@@ -131,4 +131,22 @@ const publishRFQ = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllRFQs, getRFQById, createRFQ, updateRFQ, deleteRFQ, assignVendors, publishRFQ };
+const getRFQQRCode = async (req, res, next) => {
+  try {
+    const { generateRFQQR } = require('../utils/rfqQR');
+    const result = await generateRFQQR(req.params.id);
+    if (!result) return res.status(404).json({ success: false, message: 'RFQ not found' });
+
+    if (req.query.format === 'json') {
+      return res.json({ success: true, data: result.snapshot });
+    }
+
+    res.set('Content-Type', 'image/png');
+    res.set('Content-Disposition', `inline; filename="rfq-${req.params.id}-qr.png"`);
+    res.send(result.png);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getAllRFQs, getRFQById, createRFQ, updateRFQ, deleteRFQ, assignVendors, publishRFQ, getRFQQRCode };
