@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { rfqAPI, vendorAPI } from '../api';
+import api from '../api/client';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
@@ -13,6 +14,8 @@ export default function RFQs() {
   const [rfqs, setRfqs] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [qrRFQ, setQrRFQ] = useState(null);
+  const [qrSnapshot, setQrSnapshot] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(empty);
   const [err, setErr] = useState('');
@@ -31,12 +34,15 @@ export default function RFQs() {
     } catch (ex) { setErr(ex.response?.data?.message || 'Error'); }
   };
 
-  const publish = async (id) => {
-    await rfqAPI.publish(id); load();
-  };
+  const publish = async (id) => { await rfqAPI.publish(id); load(); };
 
   const assignVendors = async (rfqId, vids) => {
     await rfqAPI.assignVendors(rfqId, vids); load(); setSelected(null);
+  };
+
+  const openQR = async (r) => {
+    setQrRFQ(r); setQrSnapshot(null);
+    rfqAPI.qrSnapshot(r.id).then((res) => setQrSnapshot(res.data.data)).catch(() => {});
   };
 
   const cols = [
@@ -45,6 +51,12 @@ export default function RFQs() {
     { key: 'deadline', label: 'Deadline', render: (r) => r.deadline ? new Date(r.deadline).toLocaleDateString() : '—' },
     { key: 'quantity', label: 'Qty' },
     { key: 'unit', label: 'Unit' },
+    ...(user?.role !== 'vendor' ? [{
+      key: '_qr', label: '',
+      render: (r) => (
+        <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); openQR(r); }}>QR</button>
+      )
+    }] : []),
     ...(isOfficer ? [{
       key: '_actions', label: '',
       render: (r) => (
@@ -88,6 +100,132 @@ export default function RFQs() {
           <AssignVendors rfq={selected} vendors={vendors} onAssign={assignVendors} />
         </Modal>
       )}
+
+      {qrRFQ && (
+        <Modal title={`QR Code — ${qrRFQ.title}`} onClose={() => { setQrRFQ(null); setQrSnapshot(null); }}>
+          <RFQQRModal rfq={qrRFQ} snapshot={qrSnapshot} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function RFQQRModal({ rfq, snapshot }) {
+  const [qrObjectUrl, setQrObjectUrl] = useState(null);
+
+  useEffect(() => {
+    api.get(`/rfqs/${rfq.id}/qr`, { responseType: 'blob' })
+      .then((res) => setQrObjectUrl(URL.createObjectURL(res.data)))
+      .catch(() => {});
+    return () => { if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl); };
+  }, [rfq.id]);
+
+  return (
+    <div className="qr-modal">
+      <div className="qr-image-wrap">
+        {qrObjectUrl
+          ? <img src={qrObjectUrl} alt="RFQ QR Code" className="qr-img" />
+          : <div className="qr-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 12 }}>Loading…</div>
+        }
+        {qrObjectUrl && (
+          <a href={qrObjectUrl} download={`rfq-${rfq.id}-qr.png`} className="btn btn-outline btn-sm" style={{ marginTop: 8 }}>
+            Download QR
+          </a>
+        )}
+      </div>
+
+      {snapshot ? (
+        <div className="qr-snapshot">
+          <SnapSection title="RFQ Info">
+            <SnapRow label="ID" value={snapshot.id} mono />
+            <SnapRow label="Title" value={snapshot.title} />
+            <SnapRow label="Status" value={snapshot.status} />
+            <SnapRow label="Created By" value={snapshot.created_by} />
+            <SnapRow label="Quantity" value={`${snapshot.quantity} ${snapshot.unit}`} />
+            <SnapRow label="Deadline" value={snapshot.deadline ? new Date(snapshot.deadline).toLocaleDateString() : '—'} />
+          </SnapSection>
+
+          {snapshot.vendors_assigned?.length > 0 && (
+            <SnapSection title="Vendors Assigned">
+              {snapshot.vendors_assigned.map((v, i) => <div key={i} className="snap-tag">{v}</div>)}
+            </SnapSection>
+          )}
+
+          {snapshot.quotations?.length > 0 && (
+            <SnapSection title="Quotations">
+              {snapshot.quotations.map((q, i) => (
+                <div key={i} className="snap-card">
+                  <SnapRow label="Vendor" value={q.vendor} />
+                  <SnapRow label="Amount" value={q.amount} />
+                  <SnapRow label="Delivery" value={`${q.delivery_days} days`} />
+                  <SnapRow label="Status" value={q.status} />
+                </div>
+              ))}
+            </SnapSection>
+          )}
+
+          {snapshot.approvals?.length > 0 && (
+            <SnapSection title="Approvals">
+              {snapshot.approvals.map((a, i) => (
+                <div key={i} className="snap-card">
+                  <SnapRow label="Status" value={a.status} />
+                  <SnapRow label="Approved By" value={a.approved_by || '—'} />
+                  <SnapRow label="Remarks" value={a.remarks || '—'} />
+                </div>
+              ))}
+            </SnapSection>
+          )}
+
+          {snapshot.purchase_orders?.length > 0 && (
+            <SnapSection title="Purchase Orders">
+              {snapshot.purchase_orders.map((p, i) => (
+                <div key={i} className="snap-card">
+                  <SnapRow label="PO Number" value={p.po_number} mono />
+                  <SnapRow label="Vendor" value={p.vendor} />
+                  <SnapRow label="Amount" value={p.amount} />
+                  <SnapRow label="Status" value={p.status} />
+                  <SnapRow label="Expected Delivery" value={p.expected_delivery ? new Date(p.expected_delivery).toLocaleDateString() : '—'} />
+                </div>
+              ))}
+            </SnapSection>
+          )}
+
+          {snapshot.invoices?.length > 0 && (
+            <SnapSection title="Invoices">
+              {snapshot.invoices.map((inv, i) => (
+                <div key={i} className="snap-card">
+                  <SnapRow label="Invoice #" value={inv.invoice_number} mono />
+                  <SnapRow label="Total" value={inv.total} />
+                  <SnapRow label="Status" value={inv.status} />
+                  <SnapRow label="Due Date" value={inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'} />
+                </div>
+              ))}
+            </SnapSection>
+          )}
+
+          <p className="snap-footer">Generated at {new Date(snapshot.generated_at).toLocaleString()}</p>
+        </div>
+      ) : (
+        <div className="loading" style={{ padding: 20 }}>Loading snapshot…</div>
+      )}
+    </div>
+  );
+}
+
+function SnapSection({ title, children }) {
+  return (
+    <div className="snap-section">
+      <div className="snap-section-title">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function SnapRow({ label, value, mono }) {
+  return (
+    <div className="snap-row">
+      <span className="snap-label">{label}</span>
+      <span className={`snap-value${mono ? ' snap-mono' : ''}`}>{value ?? '—'}</span>
     </div>
   );
 }

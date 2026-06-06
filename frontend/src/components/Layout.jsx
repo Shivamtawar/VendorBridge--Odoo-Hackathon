@@ -1,5 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Chatbot from './Chatbot';
 
 const navByRole = {
   admin: [
@@ -69,6 +70,7 @@ export default function Layout({ children }) {
         </div>
       </aside>
       <main className="main-content">{children}</main>
+      <Chatbot />
     </div>
   );
 }

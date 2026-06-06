@@ -95,3 +95,9 @@ export const activityAPI = {
   markRead: (id) => api.patch(`/activity/notifications/${id}/read`),
   markAllRead: () => api.patch('/activity/notifications/read-all'),
 };
+
+// Chat
+export const chatAPI = {
+  send: (data) => api.post('/chat/message', data),
+  items: (topic) => api.get(`/chat/items/${topic}`),
+};
