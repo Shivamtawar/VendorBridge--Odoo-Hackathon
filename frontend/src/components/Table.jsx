@@ -1,5 +1,10 @@
 export default function Table({ columns, data, onRow }) {
-  if (!data?.length) return <p className="empty">No records found.</p>;
+  if (!data?.length) return (
+    <div className="empty">
+      <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}>📭</div>
+      No records found.
+    </div>
+  );
   return (
     <div className="table-wrap">
       <table>

@@ -11,16 +11,18 @@ export default function MyQuotations() {
   }, []);
 
   const cols = [
-    { key: 'rfq_title', label: 'RFQ' },
-    { key: 'total_amount', label: 'Amount (₹)', render: (r) => `₹${Number(r.total_amount).toLocaleString('en-IN')}` },
+    { key: 'rfq_title', label: 'RFQ', render: (r) => <span style={{fontWeight:600}}>{r.rfq_title}</span> },
+    { key: 'total_amount', label: 'Amount (₹)', render: (r) => <span style={{fontWeight:700,color:'var(--brand)'}}>₹{Number(r.total_amount).toLocaleString('en-IN')}</span> },
     { key: 'delivery_days', label: 'Delivery (days)' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'created_at', label: 'Submitted', render: (r) => new Date(r.created_at).toLocaleDateString() },
+    { key: 'created_at', label: 'Submitted', render: (r) => new Date(r.created_at).toLocaleDateString('en-IN') },
   ];
 
   return (
     <div className="page">
-      <div className="page-header"><h1>My Quotations</h1></div>
+      <div className="page-header">
+        <div><h1>My Quotations</h1><p className="page-subtitle">{quotations.length} submitted quotation{quotations.length !== 1 ? 's' : ''}</p></div>
+      </div>
       <Table columns={cols} data={quotations} />
     </div>
   );

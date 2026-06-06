@@ -31,35 +31,30 @@ export default function RFQs() {
     } catch (ex) { setErr(ex.response?.data?.message || 'Error'); }
   };
 
-  const publish = async (id) => {
-    await rfqAPI.publish(id); load();
-  };
-
-  const assignVendors = async (rfqId, vids) => {
-    await rfqAPI.assignVendors(rfqId, vids); load(); setSelected(null);
-  };
+  const publish = async (id) => { await rfqAPI.publish(id); load(); };
+  const assignVendors = async (rfqId, vids) => { await rfqAPI.assignVendors(rfqId, vids); load(); setSelected(null); };
 
   const cols = [
-    { key: 'title', label: 'Title' },
+    { key: 'title', label: 'Title', render: (r) => <span style={{fontWeight:600,color:'var(--text)'}}>{r.title}</span> },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'deadline', label: 'Deadline', render: (r) => r.deadline ? new Date(r.deadline).toLocaleDateString() : '—' },
+    { key: 'deadline', label: 'Deadline', render: (r) => r.deadline ? new Date(r.deadline).toLocaleDateString('en-IN') : '—' },
     { key: 'quantity', label: 'Qty' },
     { key: 'unit', label: 'Unit' },
-    ...(isOfficer ? [{
-      key: '_actions', label: '',
-      render: (r) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          {r.status === 'draft' && <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); publish(r.id); }}>Publish</button>}
-          <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setSelected(r); }}>Assign Vendors</button>
-        </div>
-      )
-    }] : []),
+    ...(isOfficer ? [{ key: '_actions', label: '', render: (r) => (
+      <div style={{ display: 'flex', gap: 6 }}>
+        {r.status === 'draft' && <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); publish(r.id); }}>Publish</button>}
+        <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setSelected(r); }}>Assign Vendors</button>
+      </div>
+    )}] : []),
   ];
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>RFQs</h1>
+        <div>
+          <h1>RFQs</h1>
+          <p className="page-subtitle">Requests for Quotation</p>
+        </div>
         {isOfficer && <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Create RFQ</button>}
       </div>
       <Table columns={cols} data={rfqs} />
@@ -68,17 +63,14 @@ export default function RFQs() {
         <Modal title="Create RFQ" onClose={() => setShowForm(false)}>
           {err && <div className="alert alert-error">{err}</div>}
           <form onSubmit={save} className="form-stack">
-            <label>Title</label>
-            <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-            <label>Description</label>
-            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
+            <div><label>Title</label><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required placeholder="e.g. Office Furniture Procurement Q2" /></div>
+            <div><label>Description</label><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Detailed specifications…" /></div>
             <div className="form-row">
               <div><label>Quantity</label><input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></div>
-              <div><label>Unit</label><input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="pcs, kg…" /></div>
+              <div><label>Unit</label><input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="pcs, kg, sets…" /></div>
             </div>
-            <label>Deadline</label>
-            <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
-            <button className="btn btn-primary">Create</button>
+            <div><label>Deadline</label><input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} /></div>
+            <button className="btn btn-primary">Create RFQ</button>
           </form>
         </Modal>
       )}
@@ -93,21 +85,22 @@ export default function RFQs() {
 }
 
 function AssignVendors({ rfq, vendors, onAssign }) {
-  const [selected, setSelected] = useState([]);
-  const toggle = (id) => setSelected((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const toggle = (id) => setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
   return (
     <div className="form-stack">
-      <p>Select vendors to assign to this RFQ:</p>
+      <p style={{color:'var(--muted)',fontSize:13}}>Select vendors to receive this RFQ:</p>
       <div className="vendor-checklist">
         {vendors.map((v) => (
           <label key={v.id} className="check-item">
-            <input type="checkbox" checked={selected.includes(v.id)} onChange={() => toggle(v.id)} />
-            {v.company_name} <span className="text-muted">({v.category})</span>
+            <input type="checkbox" checked={selectedIds.includes(v.id)} onChange={() => toggle(v.id)} />
+            <span style={{fontWeight:500}}>{v.company_name}</span>
+            <span className="text-muted" style={{fontSize:12}}>({v.category || 'Uncategorized'})</span>
           </label>
         ))}
       </div>
-      <button className="btn btn-primary" disabled={!selected.length} onClick={() => onAssign(rfq.id, selected)}>
-        Assign {selected.length} vendor{selected.length !== 1 ? 's' : ''}
+      <button className="btn btn-primary" disabled={!selectedIds.length} onClick={() => onAssign(rfq.id, selectedIds)}>
+        Assign {selectedIds.length} vendor{selectedIds.length !== 1 ? 's' : ''}
       </button>
     </div>
   );

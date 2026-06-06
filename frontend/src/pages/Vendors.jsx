@@ -16,6 +16,7 @@ export default function Vendors() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [err, setErr] = useState('');
+  const [search, setSearch] = useState('');
 
   const load = () => vendorAPI.list().then((r) => setVendors(r.data.data?.vendors || r.data.data || []));
   useEffect(() => { load(); }, []);
@@ -28,7 +29,7 @@ export default function Vendors() {
     try {
       editing ? await vendorAPI.update(editing.id, form) : await vendorAPI.create(form);
       setShowForm(false); load();
-    } catch (ex) { setErr(ex.response?.data?.message || 'Error'); }
+    } catch (ex) { setErr(ex.response?.data?.message || 'Error saving vendor'); }
   };
 
   const remove = async (id) => {
@@ -36,31 +37,36 @@ export default function Vendors() {
     await vendorAPI.delete(id); load();
   };
 
+  const filtered = vendors.filter(v => !search || v.company_name?.toLowerCase().includes(search.toLowerCase()) || v.category?.toLowerCase().includes(search.toLowerCase()));
+
   const cols = [
-    { key: 'company_name', label: 'Company' },
-    { key: 'category', label: 'Category' },
+    { key: 'company_name', label: 'Company', render: (r) => <span style={{fontWeight:600,color:'var(--text)'}}>{r.company_name}</span> },
+    { key: 'category', label: 'Category', render: (r) => r.category ? <span style={{background:'var(--surface-2)',color:'var(--muted)',padding:'2px 8px',borderRadius:4,fontSize:11,fontWeight:600}}>{r.category}</span> : '—' },
     { key: 'contact_person', label: 'Contact' },
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Phone' },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    ...(canEdit ? [{
-      key: '_actions', label: '',
-      render: (r) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>Edit</button>
-          {canDelete && <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); remove(r.id); }}>Delete</button>}
-        </div>
-      )
-    }] : []),
+    ...(canEdit ? [{ key: '_actions', label: '', render: (r) => (
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>Edit</button>
+        {canDelete && <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); remove(r.id); }}>Delete</button>}
+      </div>
+    )}] : []),
   ];
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Vendors</h1>
+        <div>
+          <h1>Vendors</h1>
+          <p className="page-subtitle">{vendors.length} registered vendor{vendors.length !== 1 ? 's' : ''}</p>
+        </div>
         {canEdit && <button className="btn btn-primary" onClick={openNew}>+ Add Vendor</button>}
       </div>
-      <Table columns={cols} data={vendors} />
+      <div className="filter-bar">
+        <input style={{maxWidth:300}} placeholder="Search vendors…" value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <Table columns={cols} data={filtered} />
 
       {showForm && (
         <Modal title={editing ? 'Edit Vendor' : 'Add Vendor'} onClose={() => setShowForm(false)}>
@@ -76,10 +82,9 @@ export default function Vendors() {
             </div>
             <div className="form-row">
               <div><label>Phone</label><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div><label>Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
+              <div><label>Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="IT, Manufacturing…" /></div>
             </div>
-            <label>Address</label>
-            <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            <div><label>Address</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
             <button className="btn btn-primary">{editing ? 'Save Changes' : 'Add Vendor'}</button>
           </form>
         </Modal>
