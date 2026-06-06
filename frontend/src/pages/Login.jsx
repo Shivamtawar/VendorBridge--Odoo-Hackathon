@@ -44,7 +44,7 @@ export default function Login() {
           </div>
           <h2>Welcome back</h2>
           <p className="auth-subtitle">Sign in to your procurement dashboard</p>
-          {error && <div className="alert alert-error">⚠️ {error}</div>}
+          {error && <div className="alert alert-error">️ {error}</div>}
           <form onSubmit={handle}>
             <div>
               <label>Email address</label>

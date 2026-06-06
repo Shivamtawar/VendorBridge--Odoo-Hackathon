@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { rfqAPI, vendorAPI } from '../api';
+import { rfqAPI, vendorAPI, quotationAPI } from '../api';
 import api from '../api/client';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
@@ -11,20 +11,25 @@ const empty = { title: '', description: '', quantity: '', unit: '', deadline: ''
 export default function RFQs() {
   const { user } = useAuth();
   const isOfficer = user?.role === 'procurement_officer';
+  const isVendor = user?.role === 'vendor';
   const [rfqs, setRfqs] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [selected, setSelected] = useState(null);
   const [qrRFQ, setQrRFQ] = useState(null);
   const [qrSnapshot, setQrSnapshot] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [quoteRFQ, setQuoteRFQ] = useState(null);
+  const [quoteForm, setQuoteForm] = useState({ price: '', delivery_days: '', notes: '' });
+  const [quoteErr, setQuoteErr] = useState('');
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [form, setForm] = useState(empty);
   const [err, setErr] = useState('');
 
   const load = () => rfqAPI.list().then((r) => setRfqs(r.data.data?.rfqs || r.data.data || []));
   useEffect(() => {
     load();
-    vendorAPI.list().then((r) => setVendors(r.data.data?.vendors || r.data.data || []));
-  }, []);
+    if (!isVendor) vendorAPI.list().then((r) => setVendors(r.data.data?.vendors || r.data.data || []));
+  }, [isVendor]);
 
   const save = async (e) => {
     e.preventDefault(); setErr('');
@@ -37,17 +42,47 @@ export default function RFQs() {
   const publish = async (id) => { await rfqAPI.publish(id); load(); };
   const assignVendors = async (rfqId, vids) => { await rfqAPI.assignVendors(rfqId, vids); load(); setSelected(null); };
 
+  const openQR = (rfq) => {
+    setQrRFQ(rfq); setQrSnapshot(null);
+    rfqAPI.qrSnapshot(rfq.id).then((res) => setQrSnapshot(res.data.data)).catch(() => {});
+  };
+
+  const openQuote = (rfq) => {
+    setQuoteRFQ(rfq);
+    setQuoteForm({ price: '', delivery_days: '', notes: '' });
+    setQuoteErr('');
+  };
+
+  const submitQuote = async (e) => {
+    e.preventDefault(); setQuoteErr(''); setQuoteLoading(true);
+    try {
+      await quotationAPI.submit({ rfq_id: quoteRFQ.id, price: Number(quoteForm.price), delivery_days: Number(quoteForm.delivery_days), notes: quoteForm.notes });
+      setQuoteRFQ(null);
+    } catch (ex) { setQuoteErr(ex.response?.data?.message || 'Submission failed'); }
+    finally { setQuoteLoading(false); }
+  };
+
   const cols = [
     { key: 'title', label: 'Title', render: (r) => <span style={{fontWeight:600,color:'var(--text)'}}>{r.title}</span> },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'deadline', label: 'Deadline', render: (r) => r.deadline ? new Date(r.deadline).toLocaleDateString('en-IN') : '—' },
     { key: 'quantity', label: 'Qty' },
     { key: 'unit', label: 'Unit' },
+    ...(isVendor ? [{ key: '_quote', label: '', render: (r) => (
+      (r.status === 'open' || r.status === 'published') && (
+        <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); openQuote(r); }}>
+          Submit Quotation
+        </button>
+      )
+    )}] : []),
     ...(isOfficer ? [{ key: '_actions', label: '', render: (r) => (
       <div style={{ display: 'flex', gap: 6 }}>
         {r.status === 'draft' && <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); publish(r.id); }}>Publish</button>}
         <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setSelected(r); }}>Assign Vendors</button>
       </div>
+    )}] : []),
+    ...(user?.role !== 'vendor' ? [{ key: '_qr', label: '', render: (r) => (
+      <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); openQR(r); }}>QR</button>
     )}] : []),
   ];
 
@@ -87,6 +122,37 @@ export default function RFQs() {
       {qrRFQ && (
         <Modal title={`QR Code — ${qrRFQ.title}`} onClose={() => { setQrRFQ(null); setQrSnapshot(null); }}>
           <RFQQRModal rfq={qrRFQ} snapshot={qrSnapshot} />
+        </Modal>
+      )}
+
+      {quoteRFQ && (
+        <Modal title={`Submit Quotation — ${quoteRFQ.title}`} onClose={() => setQuoteRFQ(null)}>
+          <div style={{ marginBottom: 14, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 8, fontSize: 13 }}>
+            <div style={{ display: 'flex', gap: 24 }}>
+              <span><strong>Qty:</strong> {quoteRFQ.quantity} {quoteRFQ.unit}</span>
+              <span><strong>Deadline:</strong> {quoteRFQ.deadline ? new Date(quoteRFQ.deadline).toLocaleDateString('en-IN') : '—'}</span>
+            </div>
+          </div>
+          {quoteErr && <div className="alert alert-error">{quoteErr}</div>}
+          <form onSubmit={submitQuote} className="form-stack">
+            <div className="form-row">
+              <div>
+                <label>Your Price (₹)</label>
+                <input type="number" min="0" step="0.01" value={quoteForm.price} onChange={(e) => setQuoteForm({ ...quoteForm, price: e.target.value })} required placeholder="e.g. 50000" autoFocus />
+              </div>
+              <div>
+                <label>Delivery Days</label>
+                <input type="number" min="1" value={quoteForm.delivery_days} onChange={(e) => setQuoteForm({ ...quoteForm, delivery_days: e.target.value })} required placeholder="e.g. 14" />
+              </div>
+            </div>
+            <div>
+              <label>Notes / Terms</label>
+              <textarea value={quoteForm.notes} onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })} rows={3} placeholder="Payment terms, warranty, conditions…" />
+            </div>
+            <button className="btn btn-primary" disabled={quoteLoading}>
+              {quoteLoading ? 'Submitting…' : 'Submit Quotation'}
+            </button>
+          </form>
         </Modal>
       )}
     </div>

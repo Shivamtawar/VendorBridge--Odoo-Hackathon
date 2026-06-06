@@ -59,43 +59,46 @@ const getMonthlyTrends = async () => {
 };
 
 const getDashboardKPIs = async () => {
-  const [totalVendors, openRFQs, pendingApprovals, totalPOs, procurementSpend] = await Promise.all([
+  const [totalVendors, openRFQs, pendingApprovals, activePOs, monthlySpend, pendingInvoices] = await Promise.all([
     pool.query(`SELECT COUNT(*) FROM vendors WHERE status = 'active'`),
-    pool.query(`SELECT COUNT(*) FROM rfqs WHERE status = 'open'`),
+    pool.query(`SELECT COUNT(*) FROM rfqs WHERE status IN ('open', 'published')`),
     pool.query(`SELECT COUNT(*) FROM approvals WHERE status = 'pending'`),
-    pool.query(`SELECT COUNT(*) FROM purchase_orders`),
-    pool.query(`SELECT COALESCE(SUM(total), 0) as total_spend FROM invoices WHERE status = 'paid'`),
+    pool.query(`SELECT COUNT(*) FROM purchase_orders WHERE status NOT IN ('completed', 'cancelled')`),
+    pool.query(`SELECT COALESCE(SUM(total), 0) as spend FROM invoices WHERE status = 'paid' AND created_at >= DATE_TRUNC('month', NOW())`),
+    pool.query(`SELECT COUNT(*) FROM invoices WHERE status = 'issued'`),
   ]);
   return {
     total_vendors: parseInt(totalVendors.rows[0].count),
-    open_rfqs: parseInt(openRFQs.rows[0].count),
+    active_rfqs: parseInt(openRFQs.rows[0].count),
     pending_approvals: parseInt(pendingApprovals.rows[0].count),
-    total_purchase_orders: parseInt(totalPOs.rows[0].count),
-    procurement_spend: parseFloat(procurementSpend.rows[0].total_spend),
+    active_pos: parseInt(activePOs.rows[0].count),
+    monthly_spend: parseFloat(monthlySpend.rows[0].spend),
+    pending_invoices: parseInt(pendingInvoices.rows[0].count),
   };
 };
 
 const getRecentActivity = async () => {
-  const [recentRFQs, recentPOs, recentInvoices] = await Promise.all([
-    pool.query(`SELECT r.*, u.name as created_by_name FROM rfqs r LEFT JOIN users u ON r.created_by = u.id ORDER BY r.created_at DESC LIMIT 5`),
-    pool.query(`SELECT po.*, v.company_name FROM purchase_orders po LEFT JOIN vendors v ON po.vendor_id = v.id ORDER BY po.created_at DESC LIMIT 5`),
-    pool.query(`SELECT i.*, v.company_name FROM invoices i LEFT JOIN vendors v ON i.vendor_id = v.id ORDER BY i.created_at DESC LIMIT 5`),
-  ]);
-  return { recent_rfqs: recentRFQs.rows, recent_purchase_orders: recentPOs.rows, recent_invoices: recentInvoices.rows };
+  const result = await pool.query(
+    `SELECT al.id, al.action, al.entity_type, al.created_at, u.name as user_name
+     FROM activity_logs al
+     LEFT JOIN users u ON al.user_id = u.id
+     ORDER BY al.created_at DESC LIMIT 15`
+  );
+  return { recent_activity: result.rows };
 };
 
 const getVendorKPIs = async (vendorId) => {
-  const [assignedRFQs, submittedQuotations, activePOs, pendingInvoices] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM rfq_vendors WHERE vendor_id = $1`, [vendorId]),
+  const [total, accepted, pending, revenue] = await Promise.all([
     pool.query(`SELECT COUNT(*) FROM quotations WHERE vendor_id = $1`, [vendorId]),
-    pool.query(`SELECT COUNT(*) FROM purchase_orders WHERE vendor_id = $1 AND status = 'issued'`, [vendorId]),
-    pool.query(`SELECT COUNT(*) FROM invoices WHERE vendor_id = $1 AND status IN ('sent', 'overdue')`, [vendorId]),
+    pool.query(`SELECT COUNT(*) FROM quotations WHERE vendor_id = $1 AND status = 'accepted'`, [vendorId]),
+    pool.query(`SELECT COUNT(*) FROM quotations WHERE vendor_id = $1 AND status = 'submitted'`, [vendorId]),
+    pool.query(`SELECT COALESCE(SUM(total), 0) as rev FROM invoices WHERE vendor_id = $1 AND status = 'paid'`, [vendorId]),
   ]);
   return {
-    assigned_rfqs: parseInt(assignedRFQs.rows[0].count),
-    submitted_quotations: parseInt(submittedQuotations.rows[0].count),
-    active_purchase_orders: parseInt(activePOs.rows[0].count),
-    pending_invoices: parseInt(pendingInvoices.rows[0].count),
+    total_quotations: parseInt(total.rows[0].count),
+    accepted_quotations: parseInt(accepted.rows[0].count),
+    pending_quotations: parseInt(pending.rows[0].count),
+    total_revenue: parseFloat(revenue.rows[0].rev),
   };
 };
 

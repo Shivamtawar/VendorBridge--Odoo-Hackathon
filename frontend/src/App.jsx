@@ -19,6 +19,7 @@ import Users from './pages/Users';
 import Reports from './pages/Reports';
 import Activity from './pages/Activity';
 import VendorProfile from './pages/VendorProfile';
+import ChangePassword from './pages/ChangePassword';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -42,6 +43,7 @@ function AppRoutes() {
       <Route path="/reports" element={<ProtectedRoute roles={['admin','procurement_officer']}><Layout><Reports /></Layout></ProtectedRoute>} />
       <Route path="/activity" element={<ProtectedRoute roles={['admin']}><Layout><Activity /></Layout></ProtectedRoute>} />
       <Route path="/vendor-profile" element={<ProtectedRoute roles={['vendor']}><Layout><VendorProfile /></Layout></ProtectedRoute>} />
+      <Route path="/change-password" element={<ProtectedRoute><Layout><ChangePassword /></Layout></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

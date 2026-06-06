@@ -1,7 +1,11 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const pool = require('../config/db');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+  console.warn('⚠️  GEMINI_API_KEY not set — chatbot will not work. Get a key at https://aistudio.google.com/app/apikey');
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 async function fetchContext(topic, id) {
   switch (topic) {
@@ -71,6 +75,9 @@ async function listItems(topic) {
 }
 
 async function chat(history, userMessage, topic, selectedId) {
+  if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+    throw Object.assign(new Error('Gemini API key not configured'), { isApiKeyError: true });
+  }
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   let contextBlock = '';

@@ -24,8 +24,14 @@ export function AuthProvider({ children }) {
     return user;
   };
 
-  const register = async (data) => {
-    const r = await authAPI.register(data);
+  // Step 1: send registration data → triggers OTP email, no token yet
+  const registerRequest = async (data) => {
+    await authAPI.register(data);
+  };
+
+  // Step 2: verify OTP → creates account, returns token
+  const registerVerify = async (email, otp) => {
+    const r = await authAPI.verifyRegisterOtp({ email, otp });
     const { user, token } = r.data.data;
     localStorage.setItem('token', token);
     setUser(user);
@@ -38,7 +44,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, registerRequest, registerVerify, logout }}>
       {children}
     </AuthContext.Provider>
   );

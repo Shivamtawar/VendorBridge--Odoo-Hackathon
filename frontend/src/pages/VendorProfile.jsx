@@ -35,7 +35,7 @@ export default function VendorProfile() {
         {!editing && <button className="btn btn-outline" onClick={() => setEditing(true)}>Edit Profile</button>}
       </div>
       {err && <div className="alert alert-error">{err}</div>}
-      {ok && <div className="alert alert-success">✅ {ok}</div>}
+      {ok && <div className="alert alert-success">{ok}</div>}
 
       {editing ? (
         <form onSubmit={save} className="form-stack profile-form">

@@ -35,7 +35,7 @@ const findById = async (id) => {
 };
 
 const findByQuotation = async (quotationId) => {
-  const result = await pool.query('SELECT id FROM approvals WHERE quotation_id = $1', [quotationId]);
+  const result = await pool.query('SELECT id, status FROM approvals WHERE quotation_id = $1', [quotationId]);
   return result.rows[0] || null;
 };
 

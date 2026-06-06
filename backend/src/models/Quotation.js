@@ -56,7 +56,7 @@ const compareByRFQ = async (rfqId) => {
       RANK() OVER (ORDER BY q.delivery_days ASC) as delivery_rank
      FROM quotations q
      JOIN vendors v ON q.vendor_id = v.id
-     WHERE q.rfq_id = $1 AND q.status = 'submitted'
+     WHERE q.rfq_id = $1 AND q.status IN ('submitted', 'accepted', 'rejected')
      ORDER BY q.price ASC`,
     [rfqId]
   );

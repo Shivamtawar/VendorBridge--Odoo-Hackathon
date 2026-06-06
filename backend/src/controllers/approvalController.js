@@ -74,4 +74,40 @@ const processApproval = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllApprovals, getApprovalById, requestApproval, processApproval };
+// Manager/admin: approve or reject a quotation directly (auto-creates approval record if needed)
+const processQuotationDirect = async (req, res, next) => {
+  try {
+    const { status, remarks } = req.body;
+    const { quotationId } = req.params;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Status must be approved or rejected' });
+    }
+
+    const quotation = await Quotation.findStatusById(quotationId);
+    if (!quotation) return res.status(404).json({ success: false, message: 'Quotation not found' });
+
+    // Auto-create approval record if it doesn't exist yet
+    let approval = await Approval.findByQuotation(quotationId);
+    if (!approval) {
+      approval = await Approval.create(quotationId);
+    } else if (approval.status !== 'pending') {
+      return res.status(400).json({ success: false, message: `Quotation already ${approval.status}` });
+    }
+
+    const processed = await Approval.process(approval.id, { status, remarks, approvedBy: req.user.id });
+    if (!processed) {
+      return res.status(400).json({ success: false, message: 'Approval already processed' });
+    }
+
+    const quotationStatus = status === 'approved' ? 'accepted' : 'rejected';
+    await Quotation.updateStatus(quotationId, quotationStatus);
+
+    await logActivity(req.user.id, `APPROVAL_${status.toUpperCase()}`, 'approval', processed.id, { remarks });
+    res.json({ success: true, message: `Quotation ${status}`, data: processed });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getAllApprovals, getApprovalById, requestApproval, processApproval, processQuotationDirect };

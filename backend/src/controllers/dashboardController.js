@@ -24,7 +24,7 @@ const getVendorDashboard = async (req, res, next) => {
       Report.getVendorRecentQuotations(vendor.id),
     ]);
 
-    res.json({ success: true, data: { kpis, recent_quotations } });
+    res.json({ success: true, data: { vendor, stats: kpis, recent_quotations } });
   } catch (err) {
     next(err);
   }

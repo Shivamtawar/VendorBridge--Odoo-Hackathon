@@ -3,9 +3,11 @@ import api from './client';
 // Auth
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
+  verifyRegisterOtp: (data) => api.post('/auth/register/verify', data),
   login: (data) => api.post('/auth/login', data),
   me: () => api.get('/auth/me'),
   changePassword: (data) => api.put('/auth/change-password', data),
+  verifyChangePasswordOtp: (data) => api.put('/auth/change-password/verify', data),
 };
 
 // Dashboard
@@ -16,7 +18,7 @@ export const dashboardAPI = {
 
 // RFQs
 export const rfqAPI = {
-  list: () => api.get('/rfqs'),
+  list: () => api.get('/rfqs?limit=100'),
   get: (id) => api.get(`/rfqs/${id}`),
   create: (data) => api.post('/rfqs', data),
   update: (id, data) => api.put(`/rfqs/${id}`, data),
@@ -43,6 +45,7 @@ export const approvalAPI = {
   get: (id) => api.get(`/approvals/${id}`),
   request: (data) => api.post('/approvals', data),
   process: (id, data) => api.patch(`/approvals/${id}/process`, data),
+  processQuotation: (quotationId, data) => api.patch(`/approvals/quotation/${quotationId}/process`, data),
 };
 
 // Purchase Orders

@@ -1,7 +1,7 @@
 export default function Table({ columns, data, onRow }) {
   if (!data?.length) return (
     <div className="empty">
-      <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}>📭</div>
+      <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}></div>
       No records found.
     </div>
   );

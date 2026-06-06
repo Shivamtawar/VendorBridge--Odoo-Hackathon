@@ -9,7 +9,7 @@ router.post('/register', [
   body('name').trim().notEmpty().withMessage('Name is required'),
   body('email').isEmail().withMessage('Valid email required'),
   body('password').isLength({ min: 6 }).withMessage('Password min 6 chars'),
-  body('role').isIn(['admin', 'procurement_officer', 'manager', 'vendor']).withMessage('Invalid role'),
+  body('role').isIn(['procurement_officer', 'manager', 'vendor']).withMessage('Invalid role — admin accounts cannot be self-registered'),
 ], validate, register);
 
 router.post('/register/verify', [

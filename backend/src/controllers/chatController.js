@@ -8,6 +8,9 @@ const sendMessage = async (req, res, next) => {
     const reply = await chat(history, message, topic, selectedId);
     res.json({ success: true, data: { reply } });
   } catch (err) {
+    if (err.isApiKeyError) {
+      return res.status(503).json({ success: false, message: 'Gemini API key not configured. Add GEMINI_API_KEY to backend/.env and restart the server.' });
+    }
     next(err);
   }
 };
