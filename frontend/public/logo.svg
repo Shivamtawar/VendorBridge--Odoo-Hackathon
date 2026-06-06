@@ -1,0 +1,26 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hexagon background -->
+  <defs>
+    <style>
+      @media (prefers-color-scheme: dark) {
+        .hexagon-fill { fill: #F4621F; }
+      }
+      @media (prefers-color-scheme: light) {
+        .hexagon-fill { fill: #F4621F; }
+      }
+    </style>
+  </defs>
+  
+  <!-- Hexagon shape -->
+  <path class="hexagon-fill" d="M 100 20 L 160 55 L 160 145 L 100 180 L 40 145 L 40 55 Z" fill="#F4621F"/>
+  
+  <!-- Checkmark (V shape) -->
+  <g transform="translate(100, 100)">
+    <!-- Left part of V -->
+    <line x1="-25" y1="15" x2="-5" y2="-15" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Right part of V -->
+    <line x1="-5" y1="-15" x2="30" y2="35" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Dot -->
+    <circle cx="0" cy="-35" r="12" fill="white"/>
+  </g>
+</svg>
