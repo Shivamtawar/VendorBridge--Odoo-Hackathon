@@ -5,24 +5,16 @@ class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
   render() {
-    if (this.state.hasError) return <div className="page"><h1>Reports</h1><div className="alert alert-error">Something went wrong.</div></div>;
+    if (this.state.hasError) return <div className="page"><h1>Reports</h1><div className="alert alert-error">Something went wrong loading reports.</div></div>;
     return this.props.children;
   }
 }
 
-function StatsTable({ title, rows, columns }) {
-  if (!rows?.length) return null;
+function StatCard({ label, value, color = 'var(--brand)' }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--muted)', textTransform: 'capitalize' }}>{title}</h3>
-      <div className="table-wrap">
-        <table>
-          <thead><tr>{columns.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
-          <tbody>{rows.map((row, i) => (
-            <tr key={i}>{columns.map((c) => <td key={c.key}>{c.render ? c.render(row) : (row[c.key] ?? '—')}</td>)}</tr>
-          ))}</tbody>
-        </table>
-      </div>
+    <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '18px 20px', borderTop: `3px solid ${color}` }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: 'Sora, sans-serif', marginBottom: 4 }}>{value}</div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', textTransform: 'capitalize', fontWeight: 500 }}>{label}</div>
     </div>
   );
 }
@@ -35,110 +27,95 @@ export default function Reports() {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([
-      reportAPI.procurementStats(),
-      reportAPI.vendorPerformance(),
-      reportAPI.monthlyTrends(),
-    ]).then(([s, p, t]) => {
-      if (!mounted) return;
-      setStats(s?.data?.data ?? null);
-      setPerf(p?.data?.data ?? []);
-      setTrends(t?.data?.data ?? []);
-    }).catch((err) => { if (mounted) setError(err); });
+    Promise.all([reportAPI.procurementStats(), reportAPI.vendorPerformance(), reportAPI.monthlyTrends()])
+      .then(([s, p, t]) => {
+        if (!mounted) return;
+        setStats(s?.data?.data ?? null);
+        setPerf(p?.data?.data ?? []);
+        setTrends(t?.data?.data ?? []);
+      }).catch((err) => { if (mounted) setError(err); });
     return () => { mounted = false; };
   }, []);
 
-  if (error) return (
-    <div className="page"><h1>Reports</h1>
-      <div className="alert alert-error">Failed to load reports.</div>
-    </div>
-  );
+  if (error) return <div className="page"><h1>Reports</h1><div className="alert alert-error">Failed to load reports.</div></div>;
 
   return (
     <ErrorBoundary>
       <div className="page">
-        <h1>Reports</h1>
+        <div className="page-header">
+          <div><h1>Reports & Analytics</h1><p className="page-subtitle">Procurement insights and performance</p></div>
+        </div>
 
         {stats && (
-          <section>
-            <h2>Procurement Stats</h2>
-            <StatsTable
-              title="RFQ breakdown by status"
-              rows={stats.rfq_stats}
-              columns={[
-                { key: 'status', label: 'Status' },
-                { key: 'count', label: 'Count' },
-              ]}
-            />
-            <StatsTable
-              title="Purchase Orders by status"
-              rows={stats.po_stats}
-              columns={[
-                { key: 'status', label: 'Status' },
-                { key: 'count', label: 'Count' },
-                { key: 'total_value', label: 'Total Value (₹)', render: (r) => `₹${Number(r.total_value ?? 0).toLocaleString('en-IN')}` },
-              ]}
-            />
-            <StatsTable
-              title="Invoices by status"
-              rows={stats.invoice_stats}
-              columns={[
-                { key: 'status', label: 'Status' },
-                { key: 'count', label: 'Count' },
-                { key: 'total_value', label: 'Total Value (₹)', render: (r) => `₹${Number(r.total_value ?? 0).toLocaleString('en-IN')}` },
-              ]}
-            />
-            <StatsTable
-              title="Top Vendors"
-              rows={stats.top_vendors}
-              columns={[
-                { key: 'company_name', label: 'Vendor' },
-                { key: 'order_count', label: 'Orders' },
-                { key: 'total_value', label: 'Total Value (₹)', render: (r) => `₹${Number(r.total_value ?? 0).toLocaleString('en-IN')}` },
-              ]}
-            />
-          </section>
+          <>
+            <h2>Procurement Overview</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 14, marginBottom: 28 }}>
+              {stats.rfq_stats?.map((s, i) => (
+                <StatCard key={i} label={`RFQs ${s.status}`} value={s.count} color={s.status === 'published' ? '#3b82f6' : s.status === 'awarded' ? '#10b981' : 'var(--muted)'} />
+              ))}
+              {stats.po_stats?.map((s, i) => (
+                <StatCard key={i} label={`POs ${s.status}`} value={s.count} color={s.status === 'completed' ? '#10b981' : 'var(--brand)'} />
+              ))}
+            </div>
+
+            <h2>Top Vendors by Spend</h2>
+            {stats.top_vendors?.length ? (
+              <div className="table-wrap" style={{marginBottom:28}}>
+                <table>
+                  <thead><tr><th>#</th><th>Vendor</th><th>Orders</th><th>Total Value (₹)</th></tr></thead>
+                  <tbody>{stats.top_vendors.map((v, i) => (
+                    <tr key={i}>
+                      <td style={{color:'var(--muted)',fontWeight:700,fontSize:12}}>{i + 1}</td>
+                      <td style={{fontWeight:600}}>{v.company_name}</td>
+                      <td>{v.order_count}</td>
+                      <td style={{fontWeight:600,color:'var(--brand)'}}>₹{Number(v.total_value ?? 0).toLocaleString('en-IN')}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            ) : <p className="empty">No vendor data.</p>}
+          </>
         )}
 
-        <section>
-          <h2>Vendor Performance</h2>
-          {Array.isArray(perf) && perf.length ? (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Vendor</th><th>Quotations</th><th>Accepted</th><th>Avg Amount (₹)</th><th>Acceptance Rate</th></tr></thead>
-                <tbody>{perf.map((v, idx) => (
-                  <tr key={v?.vendor_id ?? idx}>
-                    <td>{v?.company_name ?? '—'}</td>
-                    <td>{v?.total_quotations ?? 0}</td>
-                    <td>{v?.accepted_quotations ?? 0}</td>
-                    <td>₹{Number(v?.avg_quote_amount ?? 0).toLocaleString('en-IN')}</td>
-                    <td>{v?.acceptance_rate ?? 0}%</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          ) : <p className="empty">No data.</p>}
-        </section>
+        <h2>Vendor Performance</h2>
+        {Array.isArray(perf) && perf.length ? (
+          <div className="table-wrap" style={{marginBottom:28}}>
+            <table>
+              <thead><tr><th>Vendor</th><th>Quotations</th><th>Accepted</th><th>Avg Amount (₹)</th><th>Acceptance Rate</th></tr></thead>
+              <tbody>{perf.map((v, idx) => (
+                <tr key={v?.vendor_id ?? idx}>
+                  <td style={{fontWeight:500}}>{v?.company_name ?? '—'}</td>
+                  <td>{v?.total_quotations ?? 0}</td>
+                  <td>{v?.accepted_quotations ?? 0}</td>
+                  <td>₹{Number(v?.avg_quote_amount ?? 0).toLocaleString('en-IN')}</td>
+                  <td>
+                    <span style={{ fontWeight: 700, color: Number(v?.acceptance_rate) > 50 ? '#16a34a' : 'var(--muted)' }}>
+                      {v?.acceptance_rate ?? 0}%
+                    </span>
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        ) : <p className="empty">No performance data.</p>}
 
-        <section>
-          <h2>Monthly Trends</h2>
-          {Array.isArray(trends) && trends.length ? (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Month</th><th>RFQs</th><th>Quotations</th><th>POs</th><th>Spend (₹)</th></tr></thead>
-                <tbody>{trends.map((t, i) => (
-                  <tr key={i}>
-                    <td>{t?.month ?? '—'}</td>
-                    <td>{t?.rfqs_created ?? 0}</td>
-                    <td>{t?.quotations_submitted ?? 0}</td>
-                    <td>{t?.pos_created ?? 0}</td>
-                    <td>₹{Number(t?.total_spend ?? 0).toLocaleString('en-IN')}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          ) : <p className="empty">No data.</p>}
-        </section>
+        <h2>Monthly Trends</h2>
+        {Array.isArray(trends) && trends.length ? (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Month</th><th>RFQs</th><th>Quotations</th><th>POs</th><th>Total Spend (₹)</th></tr></thead>
+              <tbody>{trends.map((t, i) => (
+                <tr key={i}>
+                  <td style={{fontWeight:600}}>{t?.month ?? '—'}</td>
+                  <td>{t?.rfqs_created ?? 0}</td>
+                  <td>{t?.quotations_submitted ?? 0}</td>
+                  <td>{t?.pos_created ?? 0}</td>
+                  <td style={{fontWeight:600,color:'var(--brand)'}}>₹{Number(t?.total_spend ?? 0).toLocaleString('en-IN')}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        ) : <p className="empty">No trend data.</p>}
       </div>
     </ErrorBoundary>
   );

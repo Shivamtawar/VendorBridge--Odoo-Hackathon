@@ -31,31 +31,29 @@ export default function Invoices() {
     } catch (ex) { setErr(ex.response?.data?.message || 'Error'); }
   };
 
-  const updateStatus = async (id, status) => {
-    await invoiceAPI.updateStatus(id, status); setStatusModal(null); load();
-  };
+  const updateStatus = async (id, status) => { await invoiceAPI.updateStatus(id, status); setStatusModal(null); load(); };
 
   const cols = [
-    { key: 'invoice_number', label: 'Invoice #' },
-    { key: 'vendor_name', label: 'Vendor' },
-    { key: 'total', label: 'Total (₹)', render: (r) => `₹${Number(r.total).toLocaleString('en-IN')}` },
+    { key: 'invoice_number', label: 'Invoice #', render: (r) => <span style={{fontWeight:700,fontFamily:'monospace',color:'var(--brand)'}}>{r.invoice_number}</span> },
+    { key: 'vendor_name', label: 'Vendor', render: (r) => <span style={{fontWeight:500}}>{r.vendor_name}</span> },
+    { key: 'total', label: 'Total (₹)', render: (r) => <span style={{fontWeight:600}}>₹{Number(r.total).toLocaleString('en-IN')}</span> },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'due_date', label: 'Due Date', render: (r) => r.due_date ? new Date(r.due_date).toLocaleDateString() : '—' },
-    {
-      key: '_actions', label: '',
-      render: (r) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <a href={invoiceAPI.downloadUrl(r.id)} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline" onClick={(e) => e.stopPropagation()}>PDF</a>
-          {isOfficer && <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); setStatusModal(r); }}>Status</button>}
-        </div>
-      )
-    },
+    { key: 'due_date', label: 'Due Date', render: (r) => r.due_date ? new Date(r.due_date).toLocaleDateString('en-IN') : '—' },
+    { key: '_actions', label: '', render: (r) => (
+      <div style={{ display: 'flex', gap: 6 }}>
+        <a href={invoiceAPI.downloadUrl(r.id)} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline" onClick={(e) => e.stopPropagation()}>⬇️ PDF</a>
+        {isOfficer && <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setStatusModal(r); }}>Status</button>}
+      </div>
+    )},
   ];
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Invoices</h1>
+        <div>
+          <h1>Invoices</h1>
+          <p className="page-subtitle">{invoices.length} invoice{invoices.length !== 1 ? 's' : ''}</p>
+        </div>
         {isOfficer && <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Create Invoice</button>}
       </div>
       <Table columns={cols} data={invoices} />
@@ -64,19 +62,19 @@ export default function Invoices() {
         <Modal title="Create Invoice" onClose={() => setShowForm(false)}>
           {err && <div className="alert alert-error">{err}</div>}
           <form onSubmit={create} className="form-stack">
-            <label>Purchase Order</label>
-            <select value={form.po_id} onChange={(e) => setForm({ ...form, po_id: e.target.value })} required>
-              <option value="">Select PO</option>
-              {pos.map((p) => <option key={p.id} value={p.id}>{p.po_number} — {p.vendor_name}</option>)}
-            </select>
+            <div>
+              <label>Purchase Order</label>
+              <select value={form.po_id} onChange={(e) => setForm({ ...form, po_id: e.target.value })} required>
+                <option value="">Select PO</option>
+                {pos.map((p) => <option key={p.id} value={p.id}>{p.po_number} — {p.vendor_name}</option>)}
+              </select>
+            </div>
             <div className="form-row">
               <div><label>Subtotal (₹)</label><input type="number" value={form.subtotal} onChange={(e) => setForm({ ...form, subtotal: e.target.value })} required /></div>
-              <div><label>Tax (₹)</label><input type="number" value={form.tax} onChange={(e) => setForm({ ...form, tax: e.target.value })} /></div>
+              <div><label>Tax (₹)</label><input type="number" value={form.tax} onChange={(e) => setForm({ ...form, tax: e.target.value })} placeholder="0" /></div>
             </div>
-            <label>Due Date</label>
-            <input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
-            <label>Notes</label>
-            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+            <div><label>Due Date</label><input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
+            <div><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} /></div>
             <button className="btn btn-primary">Create Invoice</button>
           </form>
         </Modal>
@@ -84,9 +82,11 @@ export default function Invoices() {
 
       {statusModal && (
         <Modal title={`Update Status — ${statusModal.invoice_number}`} onClose={() => setStatusModal(null)}>
+          <p style={{color:'var(--muted)',fontSize:13,marginBottom:16}}>Current: <StatusBadge status={statusModal.status} /></p>
           <div className="form-stack">
             {STATUSES.map((s) => (
-              <button key={s} className={`btn ${statusModal.status === s ? 'btn-primary' : 'btn-outline'}`} onClick={() => updateStatus(statusModal.id, s)}>
+              <button key={s} className={`btn ${statusModal.status === s ? 'btn-primary' : s === 'paid' ? 'btn-success' : s === 'cancelled' ? 'btn-danger' : 'btn-outline'}`}
+                onClick={() => updateStatus(statusModal.id, s)}>
                 {s.charAt(0).toUpperCase() + s.slice(1)}
               </button>
             ))}
