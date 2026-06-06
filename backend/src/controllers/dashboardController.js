@@ -3,9 +3,10 @@ const Vendor = require('../models/Vendor');
 
 const getDashboard = async (req, res, next) => {
   try {
+    const isAdmin = req.user.role === 'admin';
     const [kpis, activity] = await Promise.all([
       Report.getDashboardKPIs(),
-      Report.getRecentActivity(),
+      Report.getRecentActivity({ excludeAuth: !isAdmin }),
     ]);
 
     res.json({ success: true, data: { kpis, ...activity } });

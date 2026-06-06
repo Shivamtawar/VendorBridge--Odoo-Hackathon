@@ -12,6 +12,6 @@ router.get('/:id/download', downloadInvoicePDF);
 
 // Only officer generates invoices; manager cannot
 router.post('/', authorize('procurement_officer'), createInvoice);
-router.patch('/:id/status', authorize('procurement_officer', 'admin'), updateInvoiceStatus);
+router.patch('/:id/status', authorize('procurement_officer', 'manager', 'admin'), updateInvoiceStatus);
 
 module.exports = router;

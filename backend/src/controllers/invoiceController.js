@@ -111,9 +111,9 @@ const downloadInvoicePDF = async (req, res, next) => {
 
     doc.font('Helvetica-Bold').text('Amount Summary:');
     doc.font('Helvetica');
-    doc.text(`Subtotal: ₹${parseFloat(inv.subtotal).toFixed(2)}`);
-    doc.text(`Tax: ₹${parseFloat(inv.tax).toFixed(2)}`);
-    doc.font('Helvetica-Bold').text(`Total: ₹${parseFloat(inv.total).toFixed(2)}`);
+    doc.text(`Subtotal: INR${parseFloat(inv.subtotal).toFixed(2)}`);
+    doc.text(`Tax: INR${parseFloat(inv.tax).toFixed(2)}`);
+    doc.font('Helvetica-Bold').text(`Total: INR${parseFloat(inv.total).toFixed(2)}`);
     doc.moveDown();
     doc.font('Helvetica').text(`Status: ${inv.status.toUpperCase()}`);
 

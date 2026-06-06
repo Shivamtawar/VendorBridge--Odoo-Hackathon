@@ -77,12 +77,20 @@ const getDashboardKPIs = async () => {
   };
 };
 
-const getRecentActivity = async () => {
+const AUTH_ACTIONS = ['USER_LOGIN', 'USER_REGISTERED', 'PASSWORD_CHANGED'];
+
+const getRecentActivity = async ({ excludeAuth = false } = {}) => {
+  const where = excludeAuth
+    ? `WHERE al.action NOT IN (${AUTH_ACTIONS.map((_, i) => `$${i + 1}`).join(', ')})`
+    : '';
+  const params = excludeAuth ? AUTH_ACTIONS : [];
   const result = await pool.query(
     `SELECT al.id, al.action, al.entity_type, al.created_at, u.name as user_name
      FROM activity_logs al
      LEFT JOIN users u ON al.user_id = u.id
-     ORDER BY al.created_at DESC LIMIT 15`
+     ${where}
+     ORDER BY al.created_at DESC LIMIT 15`,
+    params
   );
   return { recent_activity: result.rows };
 };

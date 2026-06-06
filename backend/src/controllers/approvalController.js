@@ -67,6 +67,10 @@ const processApproval = async (req, res, next) => {
     const quotationStatus = status === 'approved' ? 'accepted' : 'rejected';
     await Quotation.updateStatus(approval.quotation_id, quotationStatus);
 
+    if (status === 'approved') {
+      await Quotation.rejectOthersForRFQ(approval.quotation_id);
+    }
+
     await logActivity(req.user.id, `APPROVAL_${status.toUpperCase()}`, 'approval', req.params.id, { remarks });
     res.json({ success: true, message: `Approval ${status}`, data: approval });
   } catch (err) {
@@ -102,6 +106,10 @@ const processQuotationDirect = async (req, res, next) => {
 
     const quotationStatus = status === 'approved' ? 'accepted' : 'rejected';
     await Quotation.updateStatus(quotationId, quotationStatus);
+
+    if (status === 'approved') {
+      await Quotation.rejectOthersForRFQ(quotationId);
+    }
 
     await logActivity(req.user.id, `APPROVAL_${status.toUpperCase()}`, 'approval', processed.id, { remarks });
     res.json({ success: true, message: `Quotation ${status}`, data: processed });

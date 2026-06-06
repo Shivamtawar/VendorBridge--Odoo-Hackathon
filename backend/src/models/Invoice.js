@@ -42,8 +42,8 @@ const findByIdForPDF = async (id) => {
 
 const create = async ({ po_id, invoice_number, vendor_id, subtotal, tax, total, due_date }) => {
   const result = await pool.query(
-    `INSERT INTO invoices (po_id, invoice_number, vendor_id, subtotal, tax, total, due_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    `INSERT INTO invoices (po_id, invoice_number, vendor_id, subtotal, tax, total, due_date, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'sent') RETURNING *`,
     [po_id, invoice_number, vendor_id, subtotal, tax, total, due_date]
   );
   return result.rows[0];

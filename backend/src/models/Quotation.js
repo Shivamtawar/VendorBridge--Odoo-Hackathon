@@ -107,7 +107,31 @@ const findStatusById = async (id) => {
   return result.rows[0] || null;
 };
 
+// When one quotation for an RFQ is accepted, reject all others for the same RFQ
+const rejectOthersForRFQ = async (acceptedQuotationId) => {
+  // Get the rfq_id of the accepted quotation
+  const q = await pool.query('SELECT rfq_id FROM quotations WHERE id = $1', [acceptedQuotationId]);
+  if (!q.rows[0]) return;
+  const rfqId = q.rows[0].rfq_id;
+
+  // Reject all other submitted quotations for this RFQ
+  await pool.query(
+    `UPDATE quotations SET status = 'rejected', updated_at = NOW()
+     WHERE rfq_id = $1 AND id != $2 AND status IN ('submitted', 'draft')`,
+    [rfqId, acceptedQuotationId]
+  );
+
+  // Also reject any pending approvals for those quotations
+  await pool.query(
+    `UPDATE approvals SET status = 'rejected', updated_at = NOW()
+     WHERE quotation_id IN (
+       SELECT id FROM quotations WHERE rfq_id = $1 AND id != $2
+     ) AND status = 'pending'`,
+    [rfqId, acceptedQuotationId]
+  );
+};
+
 module.exports = {
   findByRFQ, findById, findByVendor, findExisting, findByIdForRFQ,
-  compareByRFQ, create, update, updateStatus, findAccepted, findStatusById,
+  compareByRFQ, create, update, updateStatus, findAccepted, findStatusById, rejectOthersForRFQ,
 };

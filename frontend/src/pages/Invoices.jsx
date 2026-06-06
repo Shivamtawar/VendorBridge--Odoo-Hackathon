@@ -6,18 +6,78 @@ import Table from '../components/Table';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 
-const STATUSES = ['issued', 'paid', 'cancelled'];
+const STATUSES = ['sent', 'paid', 'cancelled'];
+
+function PaidOverlay({ invoice, onDone }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: '#fff',
+        borderRadius: 20,
+        padding: '48px 56px',
+        textAlign: 'center',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
+        animation: 'paid-pop 0.35s cubic-bezier(0.34,1.56,0.64,1)',
+      }}>
+        {/* Animated checkmark circle */}
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%',
+          background: 'linear-gradient(135deg,#10b981,#059669)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 20px',
+          animation: 'paid-pulse 0.6s ease 0.2s both',
+        }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: '#059669', marginBottom: 6 }}>Payment Confirmed!</div>
+        <div style={{ fontSize: 15, color: '#6b7280', marginBottom: 4 }}>
+          Invoice <strong style={{ color: '#111' }}>{invoice.invoice_number}</strong>
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 24 }}>
+          ₹{Number(invoice.total ?? 0).toLocaleString('en-IN')}
+        </div>
+        <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 28 }}>
+          Paid to <strong>{invoice.company_name}</strong>
+        </div>
+        <button className="btn btn-success" style={{ minWidth: 140, fontSize: 15 }} onClick={onDone}>
+          Done
+        </button>
+      </div>
+
+      <style>{`
+        @keyframes paid-pop {
+          from { transform: scale(0.7); opacity: 0; }
+          to   { transform: scale(1);   opacity: 1; }
+        }
+        @keyframes paid-pulse {
+          0%   { transform: scale(0.6); opacity: 0; }
+          60%  { transform: scale(1.15); opacity: 1; }
+          100% { transform: scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export default function Invoices() {
   const { user } = useAuth();
   const isOfficer = user?.role === 'procurement_officer';
+  const canAct = isOfficer || user?.role === 'manager' || user?.role === 'admin';
+
   const [invoices, setInvoices] = useState([]);
   const [pos, setPOs] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
   const [form, setForm] = useState({ subtotal: '', tax: '', due_date: '', notes: '' });
-  const [statusModal, setStatusModal] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [paidInvoice, setPaidInvoice] = useState(null);
   const [err, setErr] = useState('');
 
   const load = () => invoiceAPI.list().then((r) => setInvoices(r.data.data?.invoices || r.data.data || []));
@@ -27,7 +87,6 @@ export default function Invoices() {
     if (isOfficer) {
       poAPI.list().then((r) => {
         const all = r.data.data?.purchase_orders || r.data.data || [];
-        // Only POs that are sent/acknowledged/completed (not draft/cancelled) can be invoiced
         setPOs(all.filter((p) => p.status !== 'cancelled'));
       });
     }
@@ -42,7 +101,6 @@ export default function Invoices() {
 
   const selectPO = (po) => {
     setSelectedPO(po);
-    // Auto-fill subtotal from PO total_amount
     setForm((f) => ({ ...f, subtotal: po.total_amount ? String(Number(po.total_amount)) : '' }));
   };
 
@@ -61,7 +119,19 @@ export default function Invoices() {
     } catch (ex) { setErr(ex.response?.data?.message || 'Error'); }
   };
 
-  const updateStatus = async (id, status) => { await invoiceAPI.updateStatus(id, status); setStatusModal(null); load(); };
+  const quickStatus = async (invoice, newStatus) => {
+    setActionLoading(`${invoice.id}-${newStatus}`);
+    try {
+      await invoiceAPI.updateStatus(invoice.id, newStatus);
+      if (newStatus === 'paid') {
+        await load();
+        setPaidInvoice({ ...invoice, status: 'paid' });
+      } else {
+        load();
+      }
+    } catch { /* silent */ }
+    finally { setActionLoading(null); }
+  };
 
   const downloadPDF = async (id, invoiceNumber) => {
     setPdfLoading(id);
@@ -86,7 +156,32 @@ export default function Invoices() {
     { key: 'due_date', label: 'Due Date', render: (r) => r.due_date ? new Date(r.due_date).toLocaleDateString('en-IN') : '—' },
     {
       key: '_actions', label: '', render: (r) => (
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+
+          {/* Publish — draft → sent */}
+          {canAct && r.status === 'draft' && (
+            <button
+              className="btn btn-sm btn-outline"
+              disabled={actionLoading === `${r.id}-sent`}
+              onClick={(e) => { e.stopPropagation(); quickStatus(r, 'sent'); }}
+              style={{ borderColor: '#3b82f6', color: '#3b82f6', fontWeight: 600 }}
+            >
+              {actionLoading === `${r.id}-sent` ? '…' : 'Publish'}
+            </button>
+          )}
+
+          {/* Pay — sent → paid */}
+          {canAct && r.status === 'sent' && (
+            <button
+              className="btn btn-sm btn-success"
+              disabled={actionLoading === `${r.id}-paid`}
+              onClick={(e) => { e.stopPropagation(); quickStatus(r, 'paid'); }}
+              style={{ fontWeight: 700 }}
+            >
+              {actionLoading === `${r.id}-paid` ? '…' : 'Pay'}
+            </button>
+          )}
+
           <button
             className="btn btn-sm btn-outline"
             disabled={pdfLoading === r.id}
@@ -94,11 +189,6 @@ export default function Invoices() {
           >
             {pdfLoading === r.id ? '…' : 'Download PDF'}
           </button>
-          {isOfficer && (
-            <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setStatusModal(r); }}>
-              Status
-            </button>
-          )}
         </div>
       )
     },
@@ -106,6 +196,10 @@ export default function Invoices() {
 
   return (
     <div className="page">
+      {paidInvoice && (
+        <PaidOverlay invoice={paidInvoice} onDone={() => setPaidInvoice(null)} />
+      )}
+
       <div className="page-header">
         <div>
           <h1>Invoices</h1>
@@ -113,6 +207,7 @@ export default function Invoices() {
         </div>
         {isOfficer && <button className="btn btn-primary" onClick={openForm}>+ Create Invoice</button>}
       </div>
+
       <Table columns={cols} data={invoices} />
 
       {showForm && (
@@ -120,7 +215,6 @@ export default function Invoices() {
           {err && <div className="alert alert-error">{err}</div>}
           <form onSubmit={create} className="form-stack">
 
-            {/* PO picker — cards */}
             <div>
               <label>Purchase Order</label>
               {pos.length === 0 ? (
@@ -166,7 +260,6 @@ export default function Invoices() {
               </div>
             )}
 
-            {/* Amount fields */}
             <div className="form-row">
               <div>
                 <label>Subtotal (₹)</label>
@@ -189,7 +282,6 @@ export default function Invoices() {
               </div>
             </div>
 
-            {/* Live total preview */}
             {form.subtotal && (
               <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                 <span style={{ color: 'var(--muted)' }}>Total</span>
@@ -208,23 +300,6 @@ export default function Invoices() {
 
             <button className="btn btn-primary" disabled={!selectedPO}>Create Invoice</button>
           </form>
-        </Modal>
-      )}
-
-      {statusModal && (
-        <Modal title={`Update Status — ${statusModal.invoice_number}`} onClose={() => setStatusModal(null)}>
-          <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 16 }}>Current: <StatusBadge status={statusModal.status} /></p>
-          <div className="form-stack">
-            {STATUSES.map((s) => (
-              <button
-                key={s}
-                className={`btn ${statusModal.status === s ? 'btn-primary' : s === 'paid' ? 'btn-success' : s === 'cancelled' ? 'btn-danger' : 'btn-outline'}`}
-                onClick={() => updateStatus(statusModal.id, s)}
-              >
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
-          </div>
         </Modal>
       )}
     </div>
