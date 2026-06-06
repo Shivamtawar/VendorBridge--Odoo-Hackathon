@@ -73,7 +73,7 @@ Odoo--VendorBridge/
 ```bash
 # 1. Clone the repo
 git clone <repo-url>
-cd Odoo--VendorBridge/backend
+cd VendorBridge--Odoo-Hackathon/backend
 
 # 2. Install dependencies
 npm install
